@@ -9,10 +9,9 @@ tree = [
 
 def tree2code(tree):
     return astunparse.unparse(ast.Module(body=tree))
-def visit(node,nested=False):
-    type = node['type']
+def compile(type, node, nested):
     if type == 'AstStatBlock':
-        visitBlock(node)
+        return visitBlock(node, nested)
     elif type == 'AstExprError':
         print("Syntax error")
         exit(1)
@@ -58,49 +57,46 @@ def visit(node,nested=False):
             print(f"Unhandled operator: {node['op']}")
             exit(1)
 
-        if nested:
-            return ast.BinOp(left=visit(node['left'], True), op=op, right=visit(node['right'], True))
-        else:
-            tree.append(ast.BinOp(left=visit(node['left'], True), op=op, right=visit(node['right'], True)))
+        return ast.BinOp(left=visit(node['left'], True), op=op, right=visit(node['right'], True))
     elif type == 'AstExprConstantNumber':
-        if nested:
-            return ast.Constant(n=node['value'])
-        else:
-            tree.append(ast.Constant(n=node['value']))
+        return ast.Constant(n=node['value'])
     elif type == 'AstStatExpr':
-        tree.append(ast.Expr(value=visit(node['expr'], True)))
+        return ast.Expr(value=visit(node['expr'], True))
     elif type == 'AstExprCall':
-        if nested:
-            return ast.Call(func=visit(node['func'], True), args=[visit(x, True) for x in node['args']], keywords=[])
-        else:
-            tree.append(ast.Call(func=visit(node['func'], True), args=[visit(x, True) for x in node['args']], keywords=[]))
+        return ast.Call(func=visit(node['func'], True), args=[visit(x, True) for x in node['args']], keywords=[])
     elif type == 'AstExprGlobal':
-        if nested:
-            return ast.Name(id=node['global'], ctx=ast.Load())
-        else:
-            tree.append(ast.Name(id=node['global'], ctx=ast.Load()))
+        return ast.Name(id=node['global'], ctx=ast.Load())
     elif type == 'AstExprConstantString':
-        if nested:
-            return ast.Constant(s=node['value'])
-        else:
-            tree.append(ast.Constant(s=node['value']))
+        return ast.Constant(s=node['value'])
+    elif type == 'AstStatIf':
+        test = visit(node['condition'], True)
+        body = visit(node['thenbody'], True)
+        return ast.If(test=test, body=body)
+    elif type == 'AstExprConstantBool':
+        return ast.Constant(value=node['value'])
     else:
         print(f"Unhandled type: {type}")
         print(node)
         exit(1)
-def visitBlock(node):
+def visit(node,nested=False):
+    type = node['type']
+    if nested:
+        return compile(type, node, nested)
+    else:
+        tree.append(compile(type, node, nested))
+def visitBlock(node, nested=False):
     for i in node['body']:
-        visit(i)
+        visit(i,nested)
 def main():
     # Input
     fileIn = sys.argv[1]
 
     # AST
-    ast = subprocess.run(["luau-ast", fileIn], capture_output=True).stdout.decode()
-    ast_json = json.loads(ast)['root']
+    ast_gen = subprocess.run(["luau-ast", fileIn], capture_output=True).stdout.decode()
+    ast_json = json.loads(ast_gen)['root']
     print(ast_json)
     visitBlock(ast_json)
-    print(tree)
+    print(ast.dump(ast.Module(body=tree)))
     compiled = tree2code(tree)
 
     # Output
