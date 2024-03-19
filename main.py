@@ -13,6 +13,9 @@ def visit(node,nested=False):
     type = node['type']
     if type == 'AstStatBlock':
         visitBlock(node)
+    elif type == 'AstExprError':
+        print("Syntax error")
+        exit(1)
     elif type == 'AstStatExpr':
         tree.append(ast.Expr(value=visit(node['expr'], True)))
     elif type == 'AstExprCall':
