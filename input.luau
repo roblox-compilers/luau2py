@@ -1,1 +1,1 @@
-print("Hi")
+print(10 .. 10)
